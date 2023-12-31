@@ -7,8 +7,6 @@ std::vector<ModStartJoinGame> gModStartJoin;
 std::vector<ModShutdown> gModShutdown;
 std::vector<ModRender> gModRender;
 
-int count = 0;
-
 Config AmethystRuntime::ReadConfig() {
     // Ensure it exist
     std::string configPath = GetAmethystUWPFolder() + "launcher_config.json";
@@ -58,10 +56,10 @@ void AmethystRuntime::LoadMods() {
             gModInitialize.push_back(reinterpret_cast<ModInitializeHooks>(addr));
         }
 
-        //addr = mod.GetFunction("OnPacketSend");
-        //if (addr != NULL) {
-        //    gModPacketSend.push_back(reinterpret_cast<ModPacketSend>(addr));
-        //}
+        addr = mod.GetFunction("OnPacketSend");
+        if (addr != NULL) {
+            gModPacketSend.push_back(reinterpret_cast<ModPacketSend>(addr));
+        }
 
         addr = mod.GetFunction("OnTick");
         if (addr != NULL) {
@@ -137,12 +135,12 @@ static void LoopbackPacketSender_sendToServer(LoopbackPacketSender* self, Packet
     return _LoopbackPacketSender_sendToServer(self, packet);
 }
 
-RakNetConnector::tick _RaknetConnector_tick;
-static void RaknetConnector_tick(RakNetConnector* self) {
+Level::_tickEntities _Level_tickEntities;
+static void Level_tickEntities(Level* self) {
     for (auto& tickFunc : gModTick)
         tickFunc();
 
-    return _RaknetConnector_tick(self);
+    return _Level_tickEntities(self);
 }
 
 void AmethystRuntime::InitializeHooks() {
@@ -159,8 +157,8 @@ void AmethystRuntime::InitializeHooks() {
         &LoopbackPacketSender_sendToServer, reinterpret_cast<void**>(&_LoopbackPacketSender_sendToServer));
 
     g_hookManager.CreateHook(
-        SigScan("48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 8B E1 45 33 ED"),
-        &RaknetConnector_tick, reinterpret_cast<void**>(&_RaknetConnector_tick));
+        SigScan("48 89 5C 24 ? 57 48 83 EC ? 48 8B B9 ? ? ? ? 48 8B 1F 48 3B DF 74 1F"),
+        &Level_tickEntities, reinterpret_cast<void**>(&_Level_tickEntities));
 }
 
 void AmethystRuntime::Shutdown() {

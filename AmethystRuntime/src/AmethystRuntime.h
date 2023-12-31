@@ -4,10 +4,10 @@
 #include "Mod.h"
 
 #include "minecraft/src-client/common/client/network/LoopbackPacketSender.h"
-#include "minecraft/src-client/common/client/network/RakNetConnector.h"
 #include "minecraft/src-client/common/client/game/ClientInstance.h"
 #include "minecraft/src-client/common/client/network/Packet.h"
 #include "minecraft/src-client/common/client/gui/ScreenView.h"
+#include "minecraft/src/common/world/level/Level.h"
 
 #include "amethyst/HookManager.h"
 #include "amethyst/Config.h"
