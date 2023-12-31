@@ -1,16 +1,23 @@
 #pragma once
 #include "MinHook.h"
-#include "Mod.h"
 #include "Utils.h"
-#include "amethyst/Config.h"
-#include "amethyst/HookManager.h"
+#include "Mod.h"
+
+#include "minecraft/src-client/common/client/network/LoopbackPacketSender.h"
+#include "minecraft/src-client/common/client/network/RakNetConnector.h"
 #include "minecraft/src-client/common/client/game/ClientInstance.h"
+#include "minecraft/src-client/common/client/network/Packet.h"
 #include "minecraft/src-client/common/client/gui/ScreenView.h"
+
+#include "amethyst/HookManager.h"
+#include "amethyst/Config.h"
+
 #include <fstream>
 #include <sstream>
 #include <vector>
 
 typedef void (*ModInitializeHooks)(const char* gameVersion);
+typedef void (*ModPacketSend)(LoopbackPacketSender* packetSender, Packet* packet);
 typedef void (*ModTick)();
 typedef void (*ModStartJoinGame)(ClientInstance* clientInstance);
 typedef void (*ModShutdown)();

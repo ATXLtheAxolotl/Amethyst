@@ -1,10 +1,11 @@
 #include "AmethystRuntime.h"
 
-std::vector<ModInitializeHooks> g_mod_initialize;
-std::vector<ModTick> g_mod_tick;
-std::vector<ModStartJoinGame> g_mod_start_join;
-std::vector<ModShutdown> g_mod_shutdown;
-std::vector<ModRender> g_mod_render;
+std::vector<ModInitializeHooks> gModInitialize;
+std::vector<ModPacketSend> gModPacketSend;
+std::vector<ModTick> gModTick;
+std::vector<ModStartJoinGame> gModStartJoin;
+std::vector<ModShutdown> gModShutdown;
+std::vector<ModRender> gModRender;
 
 int count = 0;
 
@@ -54,27 +55,32 @@ void AmethystRuntime::LoadMods() {
 
         addr = mod.GetFunction("Initialize");
         if (addr != NULL) {
-            g_mod_initialize.push_back(reinterpret_cast<ModInitializeHooks>(addr));
+            gModInitialize.push_back(reinterpret_cast<ModInitializeHooks>(addr));
         }
+
+        //addr = mod.GetFunction("OnPacketSend");
+        //if (addr != NULL) {
+        //    gModPacketSend.push_back(reinterpret_cast<ModPacketSend>(addr));
+        //}
 
         addr = mod.GetFunction("OnTick");
         if (addr != NULL) {
-            g_mod_tick.push_back(reinterpret_cast<ModTick>(addr));
+            gModTick.push_back(reinterpret_cast<ModTick>(addr));
         }
 
         addr = mod.GetFunction("OnStartJoinGame");
         if (addr != NULL) {
-            g_mod_start_join.push_back(reinterpret_cast<ModStartJoinGame>(addr));
+            gModStartJoin.push_back(reinterpret_cast<ModStartJoinGame>(addr));
         }
 
         addr = mod.GetFunction("OnRenderUI");
         if (addr != NULL) {
-            g_mod_render.push_back(reinterpret_cast<ModRender>(addr));
+            gModRender.push_back(reinterpret_cast<ModRender>(addr));
         }
 
         addr = mod.GetFunction("Shutdown");
         if (addr != NULL) {
-            g_mod_shutdown.push_back(reinterpret_cast<ModShutdown>(addr));
+            gModShutdown.push_back(reinterpret_cast<ModShutdown>(addr));
         } else {
             Log::Warning("[AmethystRuntime] '{}' does not have 'void Shutdown()'. A mod should remove all hooks here for hot-reloading to work.", mod.modName);
         }
@@ -90,13 +96,10 @@ void AmethystRuntime::RunMods() {
     Config config = ReadConfig();
 
     // Allow mods to create hooks
-    for (auto& init_func : g_mod_initialize)
+    for (auto& init_func : gModInitialize)
         init_func(config.gameVersion.c_str());
 
     while (true) {
-        for (auto& tick_func : g_mod_tick)
-            tick_func();
-
         Sleep(1000 / 20);
         if (GetAsyncKeyState(VK_NUMPAD0)) break;
 
@@ -113,19 +116,33 @@ void AmethystRuntime::RunMods() {
 
 // Hooks
 ScreenView::_setupAndRender _ScreenView_setupAndRender;
-
 static void* ScreenView_setupAndRender(ScreenView* self, UIRenderContext* ctx) {
-    for (auto& render_func : g_mod_render)
+    for (auto& render_func : gModRender)
         render_func(self, ctx);
     return _ScreenView_setupAndRender(self, ctx);
 }
 
 ClientInstance::_onStartJoinGame _ClientInstance_onStartJoinGame;
-
 static int64_t ClientInstance_onStartJoinGame(ClientInstance* self, int64_t a2, int64_t a3, uint64_t a4) {
-    for (auto& start_func : g_mod_start_join)
+    for (auto& start_func : gModStartJoin)
         start_func(self);
     return _ClientInstance_onStartJoinGame(self, a2, a3, a4);
+}
+
+LoopbackPacketSender::_sendToServer _LoopbackPacketSender_sendToServer;
+static void LoopbackPacketSender_sendToServer(LoopbackPacketSender* self, Packet* packet) {
+    for (auto& sendFunc : gModPacketSend)
+        sendFunc(self, packet);
+
+    return _LoopbackPacketSender_sendToServer(self, packet);
+}
+
+RakNetConnector::tick _RaknetConnector_tick;
+static void RaknetConnector_tick(RakNetConnector* self) {
+    for (auto& tickFunc : gModTick)
+        tickFunc();
+
+    return _RaknetConnector_tick(self);
 }
 
 void AmethystRuntime::InitializeHooks() {
@@ -136,13 +153,21 @@ void AmethystRuntime::InitializeHooks() {
     g_hookManager.CreateHook(
         SigScan("40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 45 8B F1"),
         &ClientInstance_onStartJoinGame, reinterpret_cast<void**>(&_ClientInstance_onStartJoinGame));
+
+    g_hookManager.CreateHook(
+        SigScan("40 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 0F B6 41"),
+        &LoopbackPacketSender_sendToServer, reinterpret_cast<void**>(&_LoopbackPacketSender_sendToServer));
+
+    g_hookManager.CreateHook(
+        SigScan("48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 8B E1 45 33 ED"),
+        &RaknetConnector_tick, reinterpret_cast<void**>(&_RaknetConnector_tick));
 }
 
 void AmethystRuntime::Shutdown() {
     g_hookManager.Shutdown();
 
     // Allow each mod to have its shutdown logic
-    for (auto& shutdown_func : g_mod_shutdown)
+    for (auto& shutdown_func : gModShutdown)
         shutdown_func();
 
     // Unload each mod dll from game memory
@@ -152,11 +177,11 @@ void AmethystRuntime::Shutdown() {
 
     // Remove any existing function addresses to mod funcs
     m_mods.clear();
-    g_mod_initialize.clear();
-    g_mod_tick.clear();
-    g_mod_start_join.clear();
-    g_mod_shutdown.clear();
-    g_mod_render.clear();
+    gModInitialize.clear();
+    gModTick.clear();
+    gModStartJoin.clear();
+    gModShutdown.clear();
+    gModRender.clear();
 
     // Disable MH and remove any created hooks
     MH_Uninitialize();

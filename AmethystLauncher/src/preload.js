@@ -1,8 +1,8 @@
 const amethyst = require('../build/Release/amethyst');
 const { shell, ipcRenderer } = require("electron")
+const { exec } = require('child_process');
 const path = require('path'); 
 const fs = require("fs")
-const { exec } = require('child_process');
 
 // Find mods folder + create if doesn't exist
 const amethystFolder = path.resolve(process.env.LOCALAPPDATA, "Packages/Microsoft.MinecraftUWP_8wekyb3d8bbwe/AC/Amethyst/");

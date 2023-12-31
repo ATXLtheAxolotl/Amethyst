@@ -10,8 +10,15 @@
         },
         {
             "type": "shell",
+            "label": "Run Dev Launcher",
+            "command": "cd AmethystLauncher; if(-Not(Test-Path node_modules)) { npm i }; npm run start",
+            "detail": "Build and run the Amethyst Launcher",
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
             "label": "Build and Run Launcher",
-            "command": "cd AmethystLauncher; mkdir build; cd build; cmake ..; msbuild AmethystLauncher.sln; cd RelWithDebInfo; ./AmethystLauncher.exe",
+            "command": "cd AmethystLauncher; if(-Not(Test-Path node_modules)) { npm i }; npm run build-installer; cd dist/win-unpacked; ./\\\"Amethyst Launcher\\\"",
             "detail": "Build and run the Amethyst Launcher",
             "problemMatcher": []
         },
