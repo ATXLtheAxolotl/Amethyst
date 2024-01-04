@@ -7,7 +7,7 @@
 #include "minecraft/src-client/common/client/game/ClientInstance.h"
 #include "minecraft/src-client/common/client/network/Packet.h"
 #include "minecraft/src-client/common/client/gui/ScreenView.h"
-#include "minecraft/src/common/world/level/Level.h"
+#include "minecraft/src/common/Minecraft.h"
 
 #include "amethyst/HookManager.h"
 #include "amethyst/Config.h"
@@ -16,12 +16,13 @@
 #include <sstream>
 #include <vector>
 
-typedef void (*ModInitializeHooks)(const char* gameVersion);
 typedef void (*ModPacketSend)(LoopbackPacketSender* packetSender, Packet* packet);
-typedef void (*ModTick)();
-typedef void (*ModStartJoinGame)(ClientInstance* clientInstance);
-typedef void (*ModShutdown)();
 typedef void (*ModRender)(ScreenView* screenView, UIRenderContext* ctx);
+typedef void (*ModStartJoinGame)(ClientInstance* clientInstance);
+typedef void (*ModInitializeHooks)(const char* gameVersion);
+typedef bool (*ModTickBefore)();
+typedef void (*ModTickAfter)();
+typedef void (*ModShutdown)();
 
 class AmethystRuntime {
 private:

@@ -1,9 +1,10 @@
 #include "AmethystRuntime.h"
 
 std::vector<ModInitializeHooks> gModInitialize;
-std::vector<ModPacketSend> gModPacketSend;
-std::vector<ModTick> gModTick;
 std::vector<ModStartJoinGame> gModStartJoin;
+std::vector<ModPacketSend> gModPacketSend;
+std::vector<ModTickBefore> gModTickBefore;
+std::vector<ModTickAfter> gModTickAfter;
 std::vector<ModShutdown> gModShutdown;
 std::vector<ModRender> gModRender;
 
@@ -61,9 +62,14 @@ void AmethystRuntime::LoadMods() {
             gModPacketSend.push_back(reinterpret_cast<ModPacketSend>(addr));
         }
 
-        addr = mod.GetFunction("OnTick");
+        addr = mod.GetFunction("OnTickBefore");
         if (addr != NULL) {
-            gModTick.push_back(reinterpret_cast<ModTick>(addr));
+            gModTickBefore.push_back(reinterpret_cast<ModTickBefore>(addr));
+        }
+
+        addr = mod.GetFunction("OnTickAfter");
+        if (addr != NULL) {
+            gModTickAfter.push_back(reinterpret_cast<ModTickAfter>(addr));
         }
 
         addr = mod.GetFunction("OnStartJoinGame");
@@ -135,12 +141,17 @@ static void LoopbackPacketSender_sendToServer(LoopbackPacketSender* self, Packet
     return _LoopbackPacketSender_sendToServer(self, packet);
 }
 
-Level::_tickEntities _Level_tickEntities;
-static void Level_tickEntities(Level* self) {
-    for (auto& tickFunc : gModTick)
+Minecraft::_update _Minecraft_update;
+static bool Minecraft_update(Minecraft* self) {
+    for (auto& tickFunc : gModTickBefore)
+        if(tickFunc()) return true;
+
+    bool value = _Minecraft_update(self);
+
+    for (auto& tickFunc : gModTickAfter)
         tickFunc();
 
-    return _Level_tickEntities(self);
+    return value;
 }
 
 void AmethystRuntime::InitializeHooks() {
@@ -157,8 +168,8 @@ void AmethystRuntime::InitializeHooks() {
         &LoopbackPacketSender_sendToServer, reinterpret_cast<void**>(&_LoopbackPacketSender_sendToServer));
 
     g_hookManager.CreateHook(
-        SigScan("48 89 5C 24 ? 57 48 83 EC ? 48 8B B9 ? ? ? ? 48 8B 1F 48 3B DF 74 1F"),
-        &Level_tickEntities, reinterpret_cast<void**>(&_Level_tickEntities));
+        SigScan("48 8B C4 48 89 58 ? 48 89 70 ? 48 89 78 ? 55 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 0F 29 70 ? 0F 29 78 ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 8B E9 48"),
+        &Minecraft_update, reinterpret_cast<void**>(&_Minecraft_update));
 }
 
 void AmethystRuntime::Shutdown() {
@@ -176,7 +187,8 @@ void AmethystRuntime::Shutdown() {
     // Remove any existing function addresses to mod funcs
     m_mods.clear();
     gModInitialize.clear();
-    gModTick.clear();
+    gModTickBefore.clear();
+    gModTickAfter.clear();
     gModStartJoin.clear();
     gModShutdown.clear();
     gModRender.clear();
